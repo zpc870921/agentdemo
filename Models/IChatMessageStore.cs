@@ -9,6 +9,11 @@ namespace historydemo1.Models
             int count,
             CancellationToken cancellationToken);
 
+        //Task<List<StoredChatMessage>>  LoadAfterAsync(
+        //   string conversationId,
+        //   long messageId,
+        //   CancellationToken cancellationToken);
+
         Task AppendAsync(
             string conversationId,
             IReadOnlyList<StoredChatMessage> messages,

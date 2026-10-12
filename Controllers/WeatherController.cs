@@ -20,10 +20,12 @@ namespace historydemo1.Controllers
         private readonly AIAgent _agent;
         private readonly RedisAgentSessionRepository _redisAgentSession;
         private static readonly ConcurrentDictionary<string,AgentSession> _sessions = new ConcurrentDictionary<string, AgentSession>();
-        public WeatherController(AIAgent agent,RedisAgentSessionRepository redisAgentSessionRepository)
+        private readonly DatabaseChatHistoryProvider _provider;
+        public WeatherController(AIAgent agent,RedisAgentSessionRepository redisAgentSessionRepository, DatabaseChatHistoryProvider provicer)
         {
             _agent = agent;
             _redisAgentSession = redisAgentSessionRepository;
+            _provider = provicer;
         }
 
 
@@ -41,22 +43,24 @@ namespace historydemo1.Controllers
             if (null == session)
                 session =await _agent.CreateSessionAsync();
 
+            _provider.SetConversationId(session,request.ConversationId);
+
             var response = await _agent.RunAsync(request.Message,session);
 
             await _redisAgentSession.SaveAsync(_agent, request.ConversationId,session);
 
             Console.WriteLine("=========history========");
-            var messages = _agent.GetService<InMemoryChatHistoryProvider>().GetMessages(session);
-            foreach (var item in messages)
-            {
-                foreach (var content in item.Contents)
-                {
-                   if(content is TextContent textContent)
-                   {
-                       Console.WriteLine(textContent.Text);
-                   }
-                }
-            }
+            //var messages = _agent.GetService<InMemoryChatHistoryProvider>().GetMessages(session);
+            //foreach (var item in messages)
+            //{
+            //    foreach (var content in item.Contents)
+            //    {
+            //       if(content is TextContent textContent)
+            //       {
+            //           Console.WriteLine(textContent.Text);
+            //       }
+            //    }
+            //}
             return Ok(new
             {
                 request.ConversationId,

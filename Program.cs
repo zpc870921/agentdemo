@@ -3,6 +3,7 @@ using historydemo1.Models;
 using historydemo1.Models.Options;
 using historydemo1.Services;
 using Microsoft.Agents.AI;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using OpenAI;
@@ -33,9 +34,11 @@ namespace historydemo1
                 return chatClient;
             });
 
+            builder.Services.AddSingleton<DatabaseChatHistoryProvider>();
             builder.Services.AddSingleton<AIAgent>(sp =>
             {
                 var chatClient = sp.GetService<IChatClient>();
+                var provider = sp.GetRequiredService<DatabaseChatHistoryProvider>();
                var agent= chatClient.AsAIAgent(new ChatClientAgentOptions
                {
                     ChatOptions=new ChatOptions
@@ -47,7 +50,7 @@ namespace historydemo1
                          如果不知道答案，不要编造。
                          """
                     },
-                    ChatHistoryProvider=  null
+                    ChatHistoryProvider= provider
                });
                 return agent;
             });
@@ -69,13 +72,14 @@ namespace historydemo1
                     ?? throw new InvalidOperationException(
                         "缺少 ConnectionStrings:AgentDb");
 
-                return new SqlSugarClient(new ConnectionConfig
+                return new SqlSugarScope(new ConnectionConfig
                 {
                     ConnectionString = connectionString,
                     DbType = DbType.MySql,
                     IsAutoCloseConnection = true
                 });
             });
+
             builder.Services.AddSingleton<IChatMessageStore, MySqlChatMessageStore>();
 
             builder.Services.AddControllers();
@@ -83,6 +87,10 @@ namespace historydemo1
             builder.Services.AddOpenApi();
 
             var app = builder.Build();
+
+            var  db = app.Services.GetRequiredService<ISqlSugarClient>();
+            db.DbMaintenance.CreateDatabase();
+            db.CodeFirst.InitTables<AgentMessageEntity>();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

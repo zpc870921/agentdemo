@@ -12,14 +12,24 @@
         private readonly IChatMessageStore _store;
 
         private readonly ProviderSessionState<State> _sessionState;
+        private readonly IConversationSummaryRepository
+     _summaryRepository;
+
+
+        private readonly IConversationSummaryService
+            _summaryService;
 
         // 每次模型调用暂时最多加载最近 20 条文本消息。
         // 下一阶段会将它升级为 Token 预算控制。
         private const int RecentMessageCount = 20;
 
-        public DatabaseChatHistoryProvider(IChatMessageStore store)
+        public DatabaseChatHistoryProvider(IChatMessageStore store, IConversationSummaryRepository summaryRepository,
+        IConversationSummaryService summaryService)
         {
             _store = store;
+
+            _summaryRepository = summaryRepository;
+            _summaryService = summaryService;
 
             _sessionState = new ProviderSessionState<State>(
                 stateInitializer: _ => new State(),
@@ -60,6 +70,14 @@
             return state.ConversationId;
         }
 
+        private State GetState(
+    AgentSession session)
+        {
+
+            return
+                _sessionState.GetOrInitializeState(session);
+        }
+
         // 1. 调用模型之前：从数据库加载历史。
         protected override async ValueTask<IEnumerable<ChatMessage>>
             ProvideChatHistoryAsync(
@@ -68,48 +86,164 @@
         {
             var conversationId = GetConversationId(context.Session);
 
-            var rows = await _store.LoadRecentAsync(
-                conversationId,
-                RecentMessageCount,
-                cancellationToken);
+            var state =
+          GetState(context.Session);
 
-            var messages = rows.Select(row =>
-                new ChatMessage(
-                    new ChatRole(row.Role),
-                    row.Content));
+            var history =
+           new List<ChatMessage>();
 
-            return messages;
+
+
+            //----------------------------------
+            // 1. 加载摘要
+            //----------------------------------
+
+            var summary =
+                await _summaryRepository.GetAsync(
+                    conversationId,
+                    cancellationToken);
+
+
+
+            if (summary != null &&
+               !string.IsNullOrWhiteSpace(summary.Summary))
+            {
+
+                history.Add(
+                    new ChatMessage(
+                        ChatRole.System,
+                        """
+                    以下内容是历史对话摘要，
+                    仅用于理解上下文，
+                    不代表当前实时事实：
+
+                    """ +
+                        summary.Summary));
+
+            }
+
+
+
+
+
+            //----------------------------------
+            // 2. 加载摘要之后的新消息
+            //----------------------------------
+
+
+            var afterId =
+                summary?
+                .SummarizedUntilMessageId
+                ??
+                0;
+
+
+
+            var messages =
+                await _summaryRepository
+                .GetMessagesAfterAsync(
+                    conversationId,
+                    afterId,
+                    cancellationToken);
+
+
+
+            foreach (var msg in messages)
+            {
+
+                history.Add(new ChatMessage(new ChatRole(msg.Role),msg.Content));
+
+            }
+
+
+
+            return history;
+
+            //var rows = await _store.LoadRecentAsync(
+            //    conversationId,
+            //    RecentMessageCount,
+            //    cancellationToken);
+
+            //var messages = rows.Select(row =>
+            //    new ChatMessage(
+            //        new ChatRole(row.Role),
+            //        row.Content));
+
+            //return messages;
         }
 
         // 2. 模型调用完成之后：只保存本轮新消息。
         protected override async ValueTask StoreChatHistoryAsync(
             InvokedContext context,
             CancellationToken cancellationToken = default)
-        {
+         {
             var conversationId = GetConversationId(context.Session);
 
-            var newMessages = context.RequestMessages
-                .Concat(context.ResponseMessages ?? [])
-                .Select(message => new StoredChatMessage(
-                    message.Role.Value,
-                    string.Join(
-                        "",
-                        message.Contents
-                            .OfType<TextContent>()
-                            .Select(content => content.Text))))
-                .Where(message => !string.IsNullOrWhiteSpace(message.Content))
+            //var newMessages = context.RequestMessages
+            //    .Concat(context.ResponseMessages ?? [])
+            //    .Select(message => new StoredChatMessage(
+            //        message.Role.Value,
+            //        string.Join(
+            //            "",
+            //            message.Contents
+            //                .OfType<TextContent>()
+            //                .Select(content => content.Text))))
+            //    .Where(message => !string.IsNullOrWhiteSpace(message.Content))
+            //    .ToList();
+
+            //await _store.AppendAsync(
+            //    conversationId,
+            //    newMessages,
+            //    cancellationToken);
+
+            if (context.InvokeException != null)
+            {
+                return;
+            }
+
+
+
+            var state =
+                GetState(context.Session);
+
+
+
+            var messages =
+                context.RequestMessages
+                .Concat(
+                    context.ResponseMessages ?? [])
                 .ToList();
+
+
+
+            //----------------------------------
+            // 保存原始消息
+            //----------------------------------
 
             await _store.AppendAsync(
                 conversationId,
-                newMessages,
-                cancellationToken);
+                //state.UserId,
+                messages.Select(x=>new StoredChatMessage(x.Role.Value,string.Join(",", x.Contents.OfType<TextContent>().Select(c => c.Text)))).ToList(),cancellationToken);
+
+
+
+
+            //----------------------------------
+            // 判断是否需要摘要
+            //----------------------------------
+
+            await _summaryService
+                .TryUpdateSummaryAsync(
+                    state.ConversationId,
+                    state.UserId,
+                    cancellationToken);
         }
 
         public sealed class State
         {
             [JsonPropertyName("conversationId")]
             public string ConversationId { get; set; } = "";
+            public string UserId { get; set; }    = "";
         }
     }
 

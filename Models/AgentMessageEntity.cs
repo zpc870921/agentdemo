@@ -18,7 +18,7 @@ namespace historydemo1.Models
         [SugarColumn(ColumnName = "role")]
         public string Role { get; set; } = string.Empty;
 
-        [SugarColumn(ColumnName = "content")]
+        [SugarColumn(ColumnName = "content",ColumnDataType ="text")]
         public string Content { get; set; } = string.Empty;
 
         [SugarColumn(ColumnName = "created_at")]

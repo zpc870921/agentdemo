@@ -1,0 +1,36 @@
+# Build results
+bin/
+obj/
+out/
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio / Rider
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# ASP.NET Core
+appsettings.Development.json
+appsettings.*.local.json
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test results
+TestResults/
+*.coverage

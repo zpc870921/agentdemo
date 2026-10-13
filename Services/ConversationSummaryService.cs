@@ -8,17 +8,20 @@
         : IConversationSummaryService
     {
         private readonly IConversationSummaryRepository _repository;
+        private readonly IChatMessageStore _store;
         private readonly IChatClient _summaryClient;
 
         // 示例参数：每20条消息尝试摘要，保留最近8条消息。
-        private const int TriggerMessageCount = 20;
+        private const int TriggerMessageCount = 10;
         private const int PreserveRecentMessages = 8;
 
         public ConversationSummaryService(
             IConversationSummaryRepository repository,
+            IChatMessageStore store,
             IChatClient summaryClient)
         {
             _repository = repository;
+            _store = store;
             _summaryClient = summaryClient;
         }
 
@@ -36,7 +39,7 @@
             var version = current?.Version ?? 0;
 
             // 只读取尚未进入摘要的历史消息。
-            var messages = await _repository.GetMessagesAfterAsync(
+            var messages = await _store.LoadAfterAsync(
                 conversationId,
                 watermark,
                 cancellationToken);
@@ -105,10 +108,7 @@
                 ConversationId = conversationId,
                 UserId = userId,
                 Summary = newSummary,
-
-                // 摘要覆盖到最后一条被总结的消息。
                 SummarizedUntilMessageId = olderMessages[^1].Id,
-
                 Version = version + 1,
                 UpdatedAt = DateTime.UtcNow
             };

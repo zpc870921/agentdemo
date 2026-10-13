@@ -43,7 +43,7 @@ namespace historydemo1.Controllers
             if (null == session)
                 session =await _agent.CreateSessionAsync();
 
-            _provider.SetConversationId(session,request.ConversationId);
+            _provider.SetConversationId(session,request.ConversationId,request.UserId);
 
             var response = await _agent.RunAsync(request.Message,session);
 

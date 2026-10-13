@@ -6,10 +6,10 @@
             string conversationId,
             CancellationToken cancellationToken);
 
-        Task<List<SummaryInputMessage>> GetMessagesAfterAsync(
-            string conversationId,
-            long messageId,
-            CancellationToken cancellationToken);
+        //Task<List<SummaryInputMessage>> GetMessagesAfterAsync(
+        //    string conversationId,
+        //    long messageId,
+        //    CancellationToken cancellationToken);
 
         Task<bool> TrySaveAsync(
             ConversationSummaryEntity summary,

@@ -34,12 +34,21 @@ namespace historydemo1
                 return chatClient;
             });
 
+            builder.Services.AddScoped<DroneAlarmTools>();
+            builder.Services.AddSingleton<IAlarmStatisticsService, AlarmStatisticsService>();
+            builder.Services.AddSingleton<IConversationSummaryRepository, SqlSugarConversationSummaryRepository>();
+            builder.Services.AddSingleton<IConversationSummaryService, ConversationSummaryService>();
             builder.Services.AddSingleton<DatabaseChatHistoryProvider>();
             builder.Services.AddSingleton<AIAgent>(sp =>
             {
                 var chatClient = sp.GetService<IChatClient>();
                 var provider = sp.GetRequiredService<DatabaseChatHistoryProvider>();
-               var agent= chatClient.AsAIAgent(new ChatClientAgentOptions
+
+                var tool = AIFunctionFactory.Create(
+     typeof(DroneAlarmTools).GetMethod(
+         nameof(DroneAlarmTools.GetRecentDroneAlarmStatistics))!,
+     target: null);
+                var agent= chatClient.AsAIAgent(new ChatClientAgentOptions
                {
                     ChatOptions=new ChatOptions
                     {
@@ -48,10 +57,11 @@ namespace historydemo1
                          请用中文回答问题。
                          请结合当前对话上下文回答用户问题。
                          如果不知道答案，不要编造。
-                         """
+                         """                     ,
+                        Tools = [tool]
                     },
                     ChatHistoryProvider= provider
-               });
+               },services:sp);
                 return agent;
             });
             builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -63,6 +73,9 @@ namespace historydemo1
 
                 return ConnectionMultiplexer.Connect(connectionString);
             });
+            builder.Services.AddSingleton(TimeProvider.System);
+            builder.Services.AddScoped<TokenBudgetManager>();
+            builder.Services.AddSingleton<ITokenEstimator,ApproximateTokenEstimator>();
             builder.Services.AddSingleton<RedisAgentSessionRepository>();
 
             builder.Services.AddSingleton<ISqlSugarClient>(_ =>
@@ -90,7 +103,7 @@ namespace historydemo1
 
             var  db = app.Services.GetRequiredService<ISqlSugarClient>();
             db.DbMaintenance.CreateDatabase();
-            db.CodeFirst.InitTables<AgentMessageEntity>();
+            db.CodeFirst.InitTables<AgentMessageEntity,ConversationSummaryEntity>();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

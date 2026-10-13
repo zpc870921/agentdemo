@@ -1,7 +1,9 @@
 ﻿namespace historydemo1.Models
 {
-    public sealed record StoredChatMessage(
-    string Role,
-    string Content,
-    long Id = 0);
+    public class StoredChatMessage
+    {
+        public string Role { get; set; }
+    public string Content { get; set; }
+    public long Id { get; set; }
+    }
 }

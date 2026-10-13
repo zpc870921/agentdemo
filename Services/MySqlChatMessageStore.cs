@@ -32,7 +32,7 @@ namespace historydemo1.Services
             entities.Reverse();
 
             return entities
-                .Select(e => new StoredChatMessage(e.Role, e.Content, e.Id))
+                .Select(e => new StoredChatMessage{ Role = e.Role, Content = e.Content, Id = e.Id })
                 .ToList();
         }
 
@@ -73,6 +73,46 @@ namespace historydemo1.Services
                 _db.AsTenant().RollbackTran();
                 throw;
             }
+        }
+
+        public async Task<List<StoredChatMessage>> LoadAfterAsync(string conversationId, long messageId, CancellationToken cancellationToken)
+        {
+            var list = await _db.Queryable<AgentMessageEntity>().Where(x =>x.ConversationId == conversationId && x.Id > messageId)
+                  .OrderBy(x => x.Id, OrderByType.Asc)
+                  .Select(x => new StoredChatMessage { 
+                    Role=x.Role,
+                    Content=x.Content,
+                    Id=x.Id
+                  })
+                  .ToListAsync();
+
+
+            return list;
+        }
+
+        public async Task<List<AgentMessageEntity>> LoadBeforeAsync(string conversationId, long afterMessageId, long beforeMessageId, int pageSize, CancellationToken cancellationToken)
+        {
+            if (pageSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+            var query = _db.Queryable<AgentMessageEntity>()
+                .Where(x => x.ConversationId == conversationId)
+                 .Where(x => x.Id > afterMessageId); 
+
+            if (beforeMessageId > 0)
+            {
+                query = query.Where(x => x.Id < beforeMessageId);
+            }
+
+            var rows = await query
+                .OrderBy(x => x.Id, OrderByType.Desc)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // SQL 返回最新消息在前；组装上下文时恢复正序。
+            rows.Reverse();
+
+            return rows;
         }
     }
 }

@@ -9,10 +9,17 @@ namespace historydemo1.Models
             int count,
             CancellationToken cancellationToken);
 
-        //Task<List<StoredChatMessage>>  LoadAfterAsync(
-        //   string conversationId,
-        //   long messageId,
-        //   CancellationToken cancellationToken);
+        Task<List<StoredChatMessage>> LoadAfterAsync(
+           string conversationId,
+           long messageId,
+           CancellationToken cancellationToken);
+        // 从指定消息 ID 之前，向历史方向分页读取。
+        Task<List<AgentMessageEntity>> LoadBeforeAsync(
+            string conversationId,
+             long afterMessageId,
+            long beforeMessageId,
+            int pageSize,
+            CancellationToken cancellationToken);
 
         Task AppendAsync(
             string conversationId,

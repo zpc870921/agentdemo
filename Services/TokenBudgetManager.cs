@@ -59,7 +59,7 @@ public sealed class TokenBudgetManager
 
                 var message = new ChatMessage(
                     role.Value,
-                    entity.Content);
+                    entity.ContentJson);
 
                 var cost = _estimator.Estimate(message);
 

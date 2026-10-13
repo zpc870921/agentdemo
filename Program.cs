@@ -34,7 +34,7 @@ namespace historydemo1
                 return chatClient;
             });
 
-            builder.Services.AddScoped<DroneAlarmTools>();
+            builder.Services.AddSingleton<DroneAlarmTools>();
             builder.Services.AddSingleton<IAlarmStatisticsService, AlarmStatisticsService>();
             builder.Services.AddSingleton<IConversationSummaryRepository, SqlSugarConversationSummaryRepository>();
             builder.Services.AddSingleton<IConversationSummaryService, ConversationSummaryService>();
@@ -47,7 +47,7 @@ namespace historydemo1
                 var tool = AIFunctionFactory.Create(
      typeof(DroneAlarmTools).GetMethod(
          nameof(DroneAlarmTools.GetRecentDroneAlarmStatistics))!,
-     target: null);
+     target: sp.GetRequiredService<DroneAlarmTools>());
                 var agent= chatClient.AsAIAgent(new ChatClientAgentOptions
                {
                     ChatOptions=new ChatOptions
